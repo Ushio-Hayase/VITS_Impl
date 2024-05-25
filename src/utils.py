@@ -27,3 +27,35 @@ def relative_position_encoding(relative_position, bidirectional=True, num_bucket
     val_if_large = tf.min(val_if_large, tf.fill(val_if_large, num_buckets - 1))
     ret += tf.where(is_small, n, val_if_large)
     return ret
+
+
+def monotonic_alignment_search(latent_representation, text_length, mel_spectrogram_length):
+    """
+    두 문장 간의 단어 정렬을 찾는 Monotonic Alignment Search 알고리즘을 구현합니다.
+
+    Args:
+        latent_representation: 텍스트의 잠재 표현.
+        text_length: 텍스트의 길이.
+        mel_spectrogram_length: Mel-스펙트rogram의 길이.
+
+    Returns:
+        단어 정렬.
+    """
+
+    # 단어 임베딩 계산
+    text_embeddings = tf.layers.dense(latent_representation, text_length)
+    mel_spectrogram_embeddings = tf.layers.dense(latent_representation, mel_spectrogram_length)
+
+    # 유사도 계산
+    similarity_matrix = tf.matmul(text_embeddings, mel_spectrogram_embeddings, transpose_b=True)
+
+    # 단어 정렬 후보 생성
+    candidates = tf.stack([tf.range(text_length), tf.range(mel_spectrogram_length)], axis=-1)
+
+    # 후보 평가
+    monotonic_scores = tf.reduce_sum(tf.gather(similarity_matrix, candidates), axis=-1)
+
+    # 최고의 정렬 선택
+    best_alignment = tf.argmax(monotonic_scores, axis=0)
+
+    return best_alignment

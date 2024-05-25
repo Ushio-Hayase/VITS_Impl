@@ -4,6 +4,7 @@ from ResidualBlock import ResidualBlock
 
 class NormalizingFlow(keras.layers.Layer):
     def __init__(self):
+        super().__init__(name="normalizing_flow")
         self.residual_1 = ResidualBlock()
         self.residual_2 = ResidualBlock()
 

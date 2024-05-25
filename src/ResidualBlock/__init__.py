@@ -2,8 +2,8 @@ import tensorflow as tf
 from tensorflow import keras
 
 class ResidualBlock(keras.layers.Layer):
-    def __init__(self, spe):
-        super().__init__(name="PoseriorEncoder")
+    def __init__(self):
+        super().__init__(name="ResidualBlock")
         self.dilated_conv = keras.layers.Conv1D(5, 5, dilation_rate=2) # Dilated convolution
 
         # Filter

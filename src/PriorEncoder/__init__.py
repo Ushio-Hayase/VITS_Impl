@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from TransformerEncoder import TextEncoder
 from NormalizingFlow import NormalizingFlow
-from utils import pad_mask, relative_position_encoding
+from utils import pad_mask, relative_position_encoding, monotonic_alignment_search
 import monotonic_align
 
 
@@ -32,7 +32,7 @@ class PriorEncoder(keras.layers.Layer):
 
         latent = self.normalizing_flow(z, condition)
 
-        attn = monotonic_align.maximum_path()
+        attn = monotonic_alignment_search()
 
 
 
