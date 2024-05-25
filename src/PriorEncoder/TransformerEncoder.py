@@ -15,7 +15,7 @@ class TextEncoder(keras.layers.Layer):
         self.norm = keras.layers.LayerNormalization()
 
         # first floor
-        self.MHA = keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model)\
+        self.MHA = keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model)
 
         # second floor
         self.FFNN1 = keras.layers.Dense(dff, activation="relu")

@@ -1,40 +1,19 @@
 import tensorflow as tf
 from tensorflow import keras
+from ..ResidualBlock import ResidualBlock
 
 class PosteriorEncoder(keras.layers.Layer):
     def __init__(self):
         super().__init__(name="PoseriorEncoder")
-        self.dilated_conv = keras.layers.Conv1D(5, 5, dilation_rate=2) # Dilated convolution
-
-        # Filter
-        self.filter = keras.layers.Conv1D(3, 3)
-        self.filter_activation = keras.layers.Activation(keras.activations.tanh) 
-
-        # Gate 
-        self.gate = keras.layers.Conv1D(3, 3)
-        self.gate_activation = keras.layers.Activation(keras.activations.sigmoid) 
-
-        # Projection Layer
-        self.filter_linear = keras.layers.Dense(2, activation=None)
-        self.gate_linear = keras.layers.Dense(2, activation=None)
-
-        self.multiply = keras.layers.Multiply() # Gate Activation Units
-
-        self.conv = keras.layers.Conv1D(1,1) # Convolution Layer
+        self.residual_block = ResidualBlock()
+        self.mu = keras.layers.Dense(1, activation=None) # 평균 생성 레이어
+        self.sigma = keras.layers.Dense(1, activation=None) # 분산 생성 레이어
     
     def call(self, inputs):
-        data, h = inputs["input"], inputs["global"]
-        data = self.dilated_conv(data)
-        
-        f = self.filter(data)
-        g = self.gate(data)
+        data, condition = inputs["input"], inputs["global"] # 들어온 데이터 분리
 
-        tanh = self.filter_activation(f + self.filter_linear(h))
-        sig = self.gate_linear(g + self.gate_linear(g))
-        
-        output = self.multiply(tanh, sig)
-        
-        output = self.conv(output)
-        
-        return data + output
+        output = self.residual_block({"input": data,"global": condition}) # 데이터 넣기
+
+        mu, sigma = self.mu(output), self.sigma(output) # 평균, 분산 각각 구하기
+        return mu, sigma
         
