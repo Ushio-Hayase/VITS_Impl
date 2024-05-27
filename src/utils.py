@@ -5,57 +5,37 @@ def pad_mask(x, pad_id : int):
     pad = [x!=pad_id][:, tf.newaxis, tf.newaxis, :]
     return pad
 
-def relative_position_encoding(relative_position, bidirectional=True, num_buckets=32, max_distance=128):
-    ret = 0
-    n = -relative_position
-    if bidirectional:
-        num_buckets //= 2
-        ret += (n < 0).to(tf.int64) * num_buckets
-        n = tf.abs(n)
-    else:
-        n = tf.max(n, tf.zeros_like(n))
-    # now n is in the range [0, inf)
+def sequence_mask(length, max_length=None):
+  if max_length is None:
+    max_length = length.max()
+  x = keras.backend.arange(max_length, dtype=length.dtype, device=length.device)
+  return x[tf.newaxis, :] < length[:, tf.newaxis]
 
-    # half of the buckets are for exact increments in positions
-    max_exact = num_buckets // 2
-    is_small = n < max_exact
+def log_likelihood(z, mu, sigma):
+    with tf.device("/CPU:0"):
+        return -0.5 * tf.reduce_sum(tf.square((z - mu) / sigma), axis=-1) - tf.reduce_sum(tf.math.log(sigma), axis=-1)
 
-    # The other half of the buckets are for logarithmically bigger bins in positions up to max_distance
-    val_if_large = max_exact + (
-            tf.math.log(n.float() / max_exact) / tf.math.log(max_distance / max_exact) * (num_buckets - max_exact)
-    ).to(tf.int64)
-    val_if_large = tf.min(val_if_large, tf.fill(val_if_large, num_buckets - 1))
-    ret += tf.where(is_small, n, val_if_large)
-    return ret
-
-
-def monotonic_alignment_search(latent_representation, text_length, mel_spectrogram_length):
-    """
-    두 문장 간의 단어 정렬을 찾는 Monotonic Alignment Search 알고리즘을 구현합니다.
-
-    Args:
-        latent_representation: 텍스트의 잠재 표현.
-        text_length: 텍스트의 길이.
-        mel_spectrogram_length: Mel-스펙트rogram의 길이.
-
-    Returns:
-        단어 정렬.
-    """
-
-    # 단어 임베딩 계산
-    text_embeddings = tf.layers.dense(latent_representation, text_length)
-    mel_spectrogram_embeddings = tf.layers.dense(latent_representation, mel_spectrogram_length)
-
-    # 유사도 계산
-    similarity_matrix = tf.matmul(text_embeddings, mel_spectrogram_embeddings, transpose_b=True)
-
-    # 단어 정렬 후보 생성
-    candidates = tf.stack([tf.range(text_length), tf.range(mel_spectrogram_length)], axis=-1)
-
-    # 후보 평가
-    monotonic_scores = tf.reduce_sum(tf.gather(similarity_matrix, candidates), axis=-1)
-
-    # 최고의 정렬 선택
-    best_alignment = tf.argmax(monotonic_scores, axis=0)
-
-    return best_alignment
+# MAS 동적 계획법 구현
+def monotonic_alignment_search(z, mu, sigma):
+    with tf.device("/CPU:0"):
+        batch_size, seq_len = tf.shape(z)[0], tf.shape(z)[1]
+        dp = tf.TensorArray(tf.float32, size=seq_len+1, dynamic_size=False, clear_after_read=False)
+        dp = dp.write(0, tf.zeros((batch_size,), dtype=tf.float32))
+        
+        for j in tf.range(1, seq_len+1):
+            current_ll = log_likelihood(z[:, j-1], mu[j-1], sigma[j-1])
+            max_prev_ll = tf.maximum(dp.read(j-1), dp.read(j-1))
+            current_q = max_prev_ll + current_ll
+            dp = dp.write(j, current_q)
+        
+        # backtracking
+        alignment = []
+        i = seq_len
+        while i > 0:
+            alignment.append(i)
+            if dp.read(i) == dp.read(i-1):
+                i -= 1
+            i -= 1
+        
+        alignment = tf.reverse(alignment, axis=[0])
+        return alignment

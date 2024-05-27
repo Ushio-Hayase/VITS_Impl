@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from .monotonic_align.core import maximum_path_c
+from core import maximum_path_c
 
 def maximum_path(neg_cent, mask):
     """ TensorFlow optimized version.
