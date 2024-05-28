@@ -1,11 +1,11 @@
 import tensorflow as tf
 from tensorflow import keras
-from ..ResidualBlock import ResidualBlock
+from .WaveNet import WaveNet
 
 class PosteriorEncoder(keras.layers.Layer):
     def __init__(self, latent_size):
         super().__init__(name="PoseriorEncoder")
-        self.residual_block = ResidualBlock()
+        self.residual_block = WaveNet()
         self.mu = keras.layers.Dense(latent_size, activation=None) # 평균 생성 레이어
         self.sigma = keras.layers.Dense(latent_size, activation=None) # 분산 생성 레이어
     

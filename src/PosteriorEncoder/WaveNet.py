@@ -1,9 +1,9 @@
 import tensorflow as tf
 from tensorflow import keras
 
-class ResidualBlock(keras.layers.Layer):
+class WaveNet(keras.layers.Layer):
     def __init__(self):
-        super().__init__(name="ResidualBlock")
+        super().__init__()
         self.dilated_conv = keras.layers.Conv1D(5, 5, dilation_rate=2) # Dilated convolution
 
         # Filter
