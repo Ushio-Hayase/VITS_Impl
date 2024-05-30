@@ -3,3 +3,5 @@ lib
 lib64
 pyvenv.cfg
 .vscode
+data
+*.pyc

@@ -226,3 +226,11 @@ def rational_quadratic_spline(inputs,
 
         return outputs, logabsdet
 
+class Flip(keras.layers.Layer):
+  def forward(self, x, training = True):
+    x =tf.reverse(x, 1)
+    if training:
+      logdet = tf.cast(logdet = keras.backend.zeros(x.size(0)), dtype=x.dtype)
+      return x, logdet
+    else:
+      return x

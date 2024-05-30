@@ -30,10 +30,10 @@ class ResBlock(keras.layers.Layer):
         self.norms_2 = keras.Sequential(norms_2)
 
     def call(self, inputs):
-        x, x_mask = inputs["input"], inputs["mask"]
+        x = inputs
 
         for i in range(self.n_layers):
-            y = self.conv_sep[i](x * x_mask)
+            y = self.conv_sep[i]()
             y = self.norms_1[i][y]
             y = keras.activations.gelu(y)
             y = self.conv_1x1[i](y)
@@ -41,19 +41,19 @@ class ResBlock(keras.layers.Layer):
             y = keras.activations.gelu(y)
             y = self.drop(y)
             x = x + y
-        return x * x_mask
+        return x
 
     
 class Log(keras.Layer):
     def call(self, inputs, training=True):
-        x, x_mask = inputs["input"], inputs["mask"]
+        x = inputs
         if training:
-            y = tf.math.log(tf.maximum(x, 1e-5)) *  x_mask
+            y = tf.math.log(tf.maximum(x, 1e-5))
             logdet = keras.backend.sum(-y, 1)
             logdet = keras.backend.sum(y, axis=2)
             return y, logdet
         else:
-            x = tf.exp(x) * x_mask
+            x = tf.exp(x)
             return x
         
 class ElementwiseAffine(keras.layers.Layer):
@@ -64,16 +64,15 @@ class ElementwiseAffine(keras.layers.Layer):
         self.logs = keras.Variable(keras.backend.zeros((channels, 1)))
 
     def call(self, inputs, training = True):
-        x, x_mask = inputs["input"], inputs["mask"]
+        x = inputs
         
         if training:
             y = self.m + tf.exp(self.logs) * x
-            y = y * x_mask
-            logdet = keras.backend.sum(self.logs * x_mask, 1)
+            logdet = keras.backend.sum(self.logs, 1)
             logdet(logdet, 2)
             return y, logdet
         else:
-            x = (x - self.m) * tf.exp(-self.logs) * x_mask
+            x = (x - self.m) * tf.exp(-self.logs)
             return x
     
 
@@ -85,17 +84,17 @@ class ConvFlow(tf.keras.Model):
     self.n_layers = n_layers
     self.num_bins = num_bins
     self.tail_bound = tail_bound
-    self.half_channels = in_channels // 2
 
     self.pre = keras.layers.Conv1D(filter_channels, 1, input_shape=(None, self.half_channels))
     self.convs = ResBlock(filter_channels, kernel_size, n_layers, p_dropout=0.)
     self.proj = keras.layers.Conv1D(self.half_channels * (num_bins * 3 - 1), 1, kernel_initializer='zeros', bias_initializer='zeros')
 
-  def call(self, x, x_mask, g=None, reverse=False):
+  def call(self, inputs, training=True):
+    x = inputs
     x0, x1 = tf.split(x, num_or_size_splits=2, axis=2)
     h = self.pre(x0)
-    h = self.convs(h, x_mask, g=g)
-    h = self.proj(h) * x_mask
+    h = self.convs(h)
+    h = self.proj(h)
 
     b, t, c = tf.shape(x0)
     h = tf.reshape(h, [b, t, -1, c])
@@ -109,23 +108,15 @@ class ConvFlow(tf.keras.Model):
         unnormalized_widths,
         unnormalized_heights,
         unnormalized_derivatives,
-        inverse=reverse,
+        inverse=not training,
         tails='linear',
         tail_bound=self.tail_bound
     )
 
-    x = tf.concat([x0, x1], axis=2) * x_mask
-    logdet = tf.reduce_sum(logabsdet * x_mask, axis=[1, 2])
-    if not reverse:
+    x = tf.concat([x0, x1], axis=2)
+    logdet = tf.reduce_sum(logabsdet, axis=[1, 2])
+    if not training:
         return x, logdet
     else:
         return x 
 
-class Flip(keras.layers.Layer):
-  def forward(self, x, training = True):
-    x =tf.reverse(x, 1)
-    if training:
-      logdet = tf.cast(logdet = keras.backend.zeros(x.size(0)), dtype=x.dtype)
-      return x, logdet
-    else:
-      return x

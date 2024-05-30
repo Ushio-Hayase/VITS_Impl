@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
-from ResidualBlock import ResidualBlock
+from ..ResidualBlock import ResidualBlock
 
 class NormalizingFlow(keras.layers.Layer):
     def __init__(self):

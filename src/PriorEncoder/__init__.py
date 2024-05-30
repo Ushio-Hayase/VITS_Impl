@@ -1,16 +1,16 @@
 import math
 import tensorflow as tf
 from tensorflow import keras
-from TransformerEncoder import TextEncoder
-from NormalizingFlow import NormalizingFlow
-from utils import pad_mask, monotonic_alignment_search
-import monotonic_align
+from .TransformerEncoder import TextEncoder
+from ..ResidualCouplingBlock import ResidualCouplingBlock
+from ..utils import pad_mask, monotonic_alignment_search
 
 
 class PriorEncoder(keras.layers.Layer):
     def __init__(self, d_model: int, dff: int, num_heads: int,\
                   num_layers : int, input_vocab_size : int,\
-                    maximum_positional_encoding :int, affine_stack : int ,\
+                    maximum_positional_encoding :int, channels: int, hidden_size: int,\
+                        kernel_size: int, dilation_rate: float, n_layers: int ,\
                         pad_id : int):
         super().__init__(name="PriorEncoder")
 
@@ -18,7 +18,7 @@ class PriorEncoder(keras.layers.Layer):
 
         self.text_encoder = TextEncoder(num_layers, d_model, num_heads, dff,input_vocab_size, maximum_positional_encoding) # 트랜스포머 인코더
 
-        self.normalizing_flow = [NormalizingFlow() for _ in range(affine_stack)] # Normalizing flow 
+        self.normalizing_flow = ResidualCouplingBlock(channels, hidden_size, kernel_size, dilation_rate, n_layers) # Normalizing flow 
 
         self.mu = keras.layers.Dense(d_model, activation=None) # 평균 생성 
         self.logvar = keras.layers.Dense(d_model, activation=None) # 분산 생성 
@@ -38,7 +38,7 @@ class PriorEncoder(keras.layers.Layer):
 
         context_vector = monotonic_alignment_search(z, text_mu, text_logvar)
         
-        return context_vector
+        return context_vector, h_text
 
             
 
